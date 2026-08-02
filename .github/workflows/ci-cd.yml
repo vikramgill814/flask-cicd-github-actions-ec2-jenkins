@@ -47,7 +47,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: "Build" application package
+      - name: Build application package
         run: |
           echo "Packaging application..."
           zip -r app-build.zip app.py requirements.txt
