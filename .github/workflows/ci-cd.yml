@@ -1,0 +1,114 @@
+name: Flask CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  release:
+    types: [published]
+
+jobs:
+  install-and-test:
+    name: Install Dependencies & Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest -v
+
+  build:
+    name: Build Application
+    needs: install-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: "Build" application package
+        run: |
+          echo "Packaging application..."
+          zip -r app-build.zip app.py requirements.txt
+          echo "Build artifact created: app-build.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flask-app-build
+          path: app-build.zip
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: flask-app-build
+
+      - name: Deploy to staging environment
+        env:
+          DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_KEY }}
+          API_TOKEN: ${{ secrets.STAGING_API_TOKEN }}
+        run: |
+          echo "Deploying to STAGING environment..."
+          echo "Using deploy key and API token from GitHub Secrets (not printed for security)."
+          # Replace this echo block with real deployment commands, e.g.:
+          # scp -i deploy_key app-build.zip user@staging-server:/app/
+          # ssh -i deploy_key user@staging-server "cd /app && unzip -o app-build.zip && systemctl restart flaskapp"
+          echo "Staging deployment complete."
+
+  deploy-production:
+    name: Deploy to Production
+    needs: build
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: flask-app-build
+
+      - name: Deploy to production environment
+        env:
+          DEPLOY_KEY: ${{ secrets.PROD_DEPLOY_KEY }}
+          API_TOKEN: ${{ secrets.PROD_API_TOKEN }}
+        run: |
+          echo "Deploying to PRODUCTION environment..."
+          echo "Using deploy key and API token from GitHub Secrets (not printed for security)."
+          # Replace this echo block with real deployment commands, e.g.:
+          # scp -i deploy_key app-build.zip user@prod-server:/app/
+          # ssh -i deploy_key user@prod-server "cd /app && unzip -o app-build.zip && systemctl restart flaskapp"
+          echo "Production deployment complete."
