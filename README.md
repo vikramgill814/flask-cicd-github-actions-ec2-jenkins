@@ -33,7 +33,11 @@ The workflow triggers on:
 3. **deploy-staging** — runs only when the triggering branch is `staging`; downloads the build artifact and deploys it (see note below)
 4. **deploy-production** — runs only when a GitHub Release is published; downloads the build artifact and deploys it (see note below)
 
-> **Note on deployment steps:** The actual deploy commands in this workflow are placeholders (`echo` statements) since there is no live staging/production server wired up in this demo. In a real deployment, the commented-out `scp`/`ssh` lines would be uncommented and pointed at a real target server (for example, an EC2 instance), using the SSH key and any API token stored in GitHub Secrets.
+> **Deployment targets:** This workflow deploys to real AWS EC2 instances via SSH.
+> - **Staging** → `vikramjeet-ec1`
+> - **Production** → `vikramjeet-ec2`
+>
+> Deployment uses [`appleboy/scp-action`](https://github.com/appleboy/scp-action) to copy `app.py` and `requirements.txt` to the instance, followed by [`appleboy/ssh-action`](https://github.com/appleboy/ssh-action) to install dependencies in a virtual environment and (re)start the Flask app in the background.
 
 ## Branch Setup
 
@@ -51,12 +55,14 @@ git push -u origin staging
 
 Go to **Repository → Settings → Secrets and variables → Actions → New repository secret** and add:
 
-| Secret Name          | Purpose                                    |
-|-----------------------|---------------------------------------------|
-| `STAGING_DEPLOY_KEY` | SSH/deploy key for the staging server        |
-| `STAGING_API_TOKEN`  | API token used during staging deployment     |
-| `PROD_DEPLOY_KEY`    | SSH/deploy key for the production server     |
-| `PROD_API_TOKEN`     | API token used during production deployment  |
+| Secret Name       | Purpose                                                      |
+|-------------------|----------------------------------------------------------------|
+| `STAGING_HOST`    | Public IP address of the staging EC2 instance (`vikramjeet-ec1`) |
+| `STAGING_SSH_KEY` | Full contents of the `.pem` private key used to SSH into staging |
+| `PROD_HOST`       | Public IP address of the production EC2 instance (`vikramjeet-ec2`) |
+| `PROD_SSH_KEY`    | Full contents of the `.pem` private key used to SSH into production |
+
+The SSH user for both instances is `ec2-user` (default for Amazon Linux AMIs), hardcoded in the workflow file.
 
 These are referenced in the workflow via `${{ secrets.SECRET_NAME }}` and are never printed in logs.
 
