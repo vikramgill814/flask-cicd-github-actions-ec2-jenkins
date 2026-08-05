@@ -69,22 +69,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Copy app files to EC2 (staging)
+        uses: appleboy/scp-action@v0.1.7
         with:
-          name: flask-app-build
+          host: ${{ secrets.STAGING_HOST }}
+          username: ec2-user
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          source: "app.py,requirements.txt"
+          target: "/home/ec2-user/flask-app"
 
-      - name: Deploy to staging environment
-        env:
-          DEPLOY_KEY: ${{ secrets.STAGING_DEPLOY_KEY }}
-          API_TOKEN: ${{ secrets.STAGING_API_TOKEN }}
-        run: |
-          echo "Deploying to STAGING environment..."
-          echo "Using deploy key and API token from GitHub Secrets (not printed for security)."
-          # Replace this echo block with real deployment commands, e.g.:
-          # scp -i deploy_key app-build.zip user@staging-server:/app/
-          # ssh -i deploy_key user@staging-server "cd /app && unzip -o app-build.zip && systemctl restart flaskapp"
-          echo "Staging deployment complete."
+      - name: Install dependencies and (re)start app on EC2 (staging)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ec2-user
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/flask-app
+            sudo dnf install -y python3-pip >/dev/null 2>&1 || true
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install -r requirements.txt
+            pkill -f "python3 app.py" || true
+            nohup python3 app.py > app.log 2>&1 &
+            sleep 2
+            curl -s http://localhost:5000/health
+            echo ""
+            echo "Staging deployment complete."
 
   deploy-production:
     name: Deploy to Production
@@ -96,19 +107,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Copy app files to EC2 (production)
+        uses: appleboy/scp-action@v0.1.7
         with:
-          name: flask-app-build
+          host: ${{ secrets.PROD_HOST }}
+          username: ec2-user
+          key: ${{ secrets.PROD_SSH_KEY }}
+          source: "app.py,requirements.txt"
+          target: "/home/ec2-user/flask-app"
 
-      - name: Deploy to production environment
-        env:
-          DEPLOY_KEY: ${{ secrets.PROD_DEPLOY_KEY }}
-          API_TOKEN: ${{ secrets.PROD_API_TOKEN }}
-        run: |
-          echo "Deploying to PRODUCTION environment..."
-          echo "Using deploy key and API token from GitHub Secrets (not printed for security)."
-          # Replace this echo block with real deployment commands, e.g.:
-          # scp -i deploy_key app-build.zip user@prod-server:/app/
-          # ssh -i deploy_key user@prod-server "cd /app && unzip -o app-build.zip && systemctl restart flaskapp"
-          echo "Production deployment complete."
+      - name: Install dependencies and (re)start app on EC2 (production)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ec2-user
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/flask-app
+            sudo dnf install -y python3-pip >/dev/null 2>&1 || true
+            python3 -m venv venv
+            source venv/bin/activate
+            pip install -r requirements.txt
+            pkill -f "python3 app.py" || true
+            nohup python3 app.py > app.log 2>&1 &
+            sleep 2
+            curl -s http://localhost:5000/health
+            echo ""
+            echo "Production deployment complete."
