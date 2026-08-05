@@ -5,13 +5,16 @@ on:
     branches:
       - main
       - staging
+
   release:
-    types: [published]
+    types:
+      - published
 
 jobs:
   install-and-test:
     name: Install Dependencies & Run Tests
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -19,41 +22,36 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests
-        run: pytest -v
+      - name: Run Tests
+        run: |
+          pytest -v
 
   build:
     name: Build Application
     needs: install-and-test
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
+      - name: Create Build Artifact
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          zip -r app-build.zip . \
+            -x ".git/*" \
+            -x ".github/*" \
+            -x "__pycache__/*" \
+            -x "*.pyc" \
+            -x "venv/*"
 
-      - name: Build application package
-        run: |
-          echo "Packaging application..."
-          zip -r app-build.zip app.py requirements.txt
-          echo "Build artifact created: app-build.zip"
-
-      - name: Upload build artifact
+      - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: flask-app-build
@@ -65,37 +63,72 @@ jobs:
     if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     environment: staging
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy app files to EC2 (staging)
+      - name: Copy project to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ec2-user
           key: ${{ secrets.STAGING_SSH_KEY }}
-          source: "app.py,requirements.txt"
+          source: "."
           target: "/home/ec2-user/flask-app"
+          strip_components: 0
+          overwrite: true
 
-      - name: Install dependencies and (re)start app on EC2 (staging)
+      - name: Deploy Application
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ec2-user
           key: ${{ secrets.STAGING_SSH_KEY }}
           script: |
+            set -e
+
             cd /home/ec2-user/flask-app
-            sudo dnf install -y python3-pip >/dev/null 2>&1 || true
-            python3 -m venv venv
+
+            sudo dnf install -y python3 python3-pip >/dev/null 2>&1 || true
+
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
+
             source venv/bin/activate
-            python3 -m pip install --upgrade pip
+
+            python -m pip install --upgrade pip
             pip install -r requirements.txt
-            pkill -f "python3 app.py" || true
+
+            PID=$(pgrep -f "python3 app.py" || true)
+
+            if [ ! -z "$PID" ]; then
+              echo "Stopping existing application..."
+              kill -15 $PID
+              sleep 3
+            fi
+
+            echo "Starting Flask application..."
+
             nohup python3 app.py > app.log 2>&1 &
-            sleep 5
-            curl -f http://localhost:5000/health
-            echo "Staging deployment complete."
+
+            sleep 8
+
+            echo "Running Processes"
+            ps -ef | grep app.py || true
+
+            echo "Application Log"
+            cat app.log || true
+
+            echo "Health Check"
+
+            curl --retry 5 \
+                 --retry-delay 2 \
+                 --retry-connrefused \
+                 -f http://localhost:5000/health
+
+            echo "Staging deployment completed successfully."
 
   deploy-production:
     name: Deploy to Production
@@ -103,34 +136,69 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-latest
     environment: production
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy app files to EC2 (production)
+      - name: Copy project to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ec2-user
           key: ${{ secrets.PROD_SSH_KEY }}
-          source: "app.py,requirements.txt"
+          source: "."
           target: "/home/ec2-user/flask-app"
+          strip_components: 0
+          overwrite: true
 
-      - name: Install dependencies and (re)start app on EC2 (production)
+      - name: Deploy Application
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ec2-user
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
+            set -e
+
             cd /home/ec2-user/flask-app
-            sudo dnf install -y python3-pip >/dev/null 2>&1 || true
-            python3 -m venv venv
+
+            sudo dnf install -y python3 python3-pip >/dev/null 2>&1 || true
+
+            if [ ! -d "venv" ]; then
+              python3 -m venv venv
+            fi
+
             source venv/bin/activate
-            python3 -m pip install --upgrade pip
+
+            python -m pip install --upgrade pip
             pip install -r requirements.txt
-            pkill -f "python3 app.py" || true
+
+            PID=$(pgrep -f "python3 app.py" || true)
+
+            if [ ! -z "$PID" ]; then
+              echo "Stopping existing application..."
+              kill -15 $PID
+              sleep 3
+            fi
+
+            echo "Starting Flask application..."
+
             nohup python3 app.py > app.log 2>&1 &
-            sleep 5
-            curl -f http://localhost:5000/health
-            echo "Production deployment complete."
+
+            sleep 8
+
+            echo "Running Processes"
+            ps -ef | grep app.py || true
+
+            echo "Application Log"
+            cat app.log || true
+
+            echo "Health Check"
+
+            curl --retry 5 \
+                 --retry-delay 2 \
+                 --retry-connrefused \
+                 -f http://localhost:5000/health
+
+            echo "Production deployment completed successfully."
