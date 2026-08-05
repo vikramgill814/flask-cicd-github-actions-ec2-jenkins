@@ -89,13 +89,12 @@ jobs:
             sudo dnf install -y python3-pip >/dev/null 2>&1 || true
             python3 -m venv venv
             source venv/bin/activate
+            python3 -m pip install --upgrade pip
             pip install -r requirements.txt
             pkill -f "python3 app.py" || true
-            setsid nohup python3 app.py < /dev/null > app.log 2>&1 &
-            disown
-            sleep 2
-            curl -s http://localhost:5000/health
-            echo ""
+            nohup python3 app.py > app.log 2>&1 &
+            sleep 5
+            curl -f http://localhost:5000/health
             echo "Staging deployment complete."
 
   deploy-production:
@@ -128,11 +127,10 @@ jobs:
             sudo dnf install -y python3-pip >/dev/null 2>&1 || true
             python3 -m venv venv
             source venv/bin/activate
+            python3 -m pip install --upgrade pip
             pip install -r requirements.txt
             pkill -f "python3 app.py" || true
-            setsid nohup python3 app.py < /dev/null > app.log 2>&1 &
-            disown
-            sleep 2
-            curl -s http://localhost:5000/health
-            echo ""
+            nohup python3 app.py > app.log 2>&1 &
+            sleep 5
+            curl -f http://localhost:5000/health
             echo "Production deployment complete."
