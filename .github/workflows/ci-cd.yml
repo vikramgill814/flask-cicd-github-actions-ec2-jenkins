@@ -91,7 +91,8 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             pkill -f "python3 app.py" || true
-            nohup python3 app.py > app.log 2>&1 &
+            setsid nohup python3 app.py < /dev/null > app.log 2>&1 &
+            disown
             sleep 2
             curl -s http://localhost:5000/health
             echo ""
@@ -129,7 +130,8 @@ jobs:
             source venv/bin/activate
             pip install -r requirements.txt
             pkill -f "python3 app.py" || true
-            nohup python3 app.py > app.log 2>&1 &
+            setsid nohup python3 app.py < /dev/null > app.log 2>&1 &
+            disown
             sleep 2
             curl -s http://localhost:5000/health
             echo ""
