@@ -101,17 +101,21 @@ jobs:
             python -m pip install --upgrade pip
             pip install -r requirements.txt
 
-            PID=$(pgrep -f "python3 app.py" || true)
-
-            if [ ! -z "$PID" ]; then
-              echo "Stopping existing application..."
-              kill -15 $PID
+            # Stop the previous run using the PID file we wrote last time.
+            # This never matches on command text, so it can't accidentally
+            # target the currently-running deploy script itself.
+            if [ -f flask.pid ] && kill -0 "$(cat flask.pid)" 2>/dev/null; then
+              echo "Stopping existing application (PID $(cat flask.pid))..."
+              kill -15 "$(cat flask.pid)"
               sleep 3
+            else
+              echo "No existing tracked application process found."
             fi
 
             echo "Starting Flask application..."
-
-            nohup python3 app.py > app.log 2>&1 &
+            setsid nohup python3 app.py < /dev/null > app.log 2>&1 &
+            echo $! > flask.pid
+            disown
 
             sleep 8
 
@@ -122,7 +126,6 @@ jobs:
             cat app.log || true
 
             echo "Health Check"
-
             curl --retry 5 \
                  --retry-delay 2 \
                  --retry-connrefused \
@@ -174,17 +177,18 @@ jobs:
             python -m pip install --upgrade pip
             pip install -r requirements.txt
 
-            PID=$(pgrep -f "python3 app.py" || true)
-
-            if [ ! -z "$PID" ]; then
-              echo "Stopping existing application..."
-              kill -15 $PID
+            if [ -f flask.pid ] && kill -0 "$(cat flask.pid)" 2>/dev/null; then
+              echo "Stopping existing application (PID $(cat flask.pid))..."
+              kill -15 "$(cat flask.pid)"
               sleep 3
+            else
+              echo "No existing tracked application process found."
             fi
 
             echo "Starting Flask application..."
-
-            nohup python3 app.py > app.log 2>&1 &
+            setsid nohup python3 app.py < /dev/null > app.log 2>&1 &
+            echo $! > flask.pid
+            disown
 
             sleep 8
 
@@ -195,7 +199,6 @@ jobs:
             cat app.log || true
 
             echo "Health Check"
-
             curl --retry 5 \
                  --retry-delay 2 \
                  --retry-connrefused \
