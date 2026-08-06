@@ -74,9 +74,8 @@ jobs:
           host: ${{ secrets.STAGING_HOST }}
           username: ec2-user
           key: ${{ secrets.STAGING_SSH_KEY }}
-          source: "."
+          source: "app.py,requirements.txt"
           target: "/home/ec2-user/flask-app"
-          strip_components: 0
           overwrite: true
 
       - name: Deploy Application
@@ -152,9 +151,8 @@ jobs:
           host: ${{ secrets.PROD_HOST }}
           username: ec2-user
           key: ${{ secrets.PROD_SSH_KEY }}
-          source: "."
+          source: "app.py,requirements.txt"
           target: "/home/ec2-user/flask-app"
-          strip_components: 0
           overwrite: true
 
       - name: Deploy Application
