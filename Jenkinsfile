@@ -4,7 +4,7 @@ pipeline {
     environment {
         VENV = "${WORKSPACE}/venv"
         STAGING_DIR = "/var/lib/jenkins/flask-staging"
-        STAGING_PORT = "5001"
+        STAGING_PORT = "5000"
     }
 
     stages {
