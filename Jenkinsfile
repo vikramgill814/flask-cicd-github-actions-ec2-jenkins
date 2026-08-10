@@ -110,11 +110,34 @@ pipeline {
 
     post {
         success {
-            echo 'Jenkins CI/CD Pipeline completed successfully.'
+            emailext(
+                subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    Jenkins CI/CD pipeline completed successfully.
+
+                    Job: ${env.JOB_NAME}
+                    Build: #${env.BUILD_NUMBER}
+                    Status: SUCCESS
+                    Build URL: ${env.BUILD_URL}
+                """,
+                to: 'vikramgill814@gmail.com'
+            )
         }
 
         failure {
-            echo 'Jenkins CI/CD Pipeline failed.'
+            emailext(
+                subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+                    Jenkins CI/CD pipeline failed.
+
+                    Job: ${env.JOB_NAME}
+                    Build: #${env.BUILD_NUMBER}
+                    Status: FAILED
+                    Check Jenkins for build logs:
+                    ${env.BUILD_URL}
+                """,
+                to: 'vikramgill@gmail.com'
+            )
         }
 
         always {
